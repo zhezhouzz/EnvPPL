@@ -39,7 +39,7 @@ def step(state, action):
 
 def model(data):
     a0 = pyro.sample('a0', dist.Normal(torch.zeros(1) + 3.0, 10 * torch.ones(1)))
-    for i in range(100):
+    for i in range(10):
         position = dist.Uniform(min_position, max_position).sample()
         velocity = dist.Uniform(-max_speed, max_speed).sample()
         action = dist.Categorical(probs=torch.ones(3)/torch.sum(torch.ones(3))).sample()
@@ -63,8 +63,8 @@ def model(data):
 def mcmc_solver():
     nuts_kernel = NUTS(model, jit_compile=False,)
     mcmc = MCMC(nuts_kernel,
-                num_samples=1000,
-                warmup_steps=1000,
+                num_samples=100,
+                warmup_steps=100,
                 num_chains=1)
     mcmc.run(model)
     mcmc.summary(prob=0.8)
