@@ -22,58 +22,96 @@ max_speed = 0.07
 goal_position = 0.5
 goal_velocity = 0
 
-force=torch.tensor(0.001)
-gravity=torch.tensor(0.0025)
+force=torch.tensor(0.001).type(torch.Tensor)
+gravity=torch.tensor(0.0025).type(torch.Tensor)
 
-low = np.array([min_position, -max_speed])
-high = np.array([max_position, max_speed])
+dataInput =[
+    (0.0, 0.03, 0),
+    (0.2, 0.03, 0),
+    (0.4, 0.03, 0),
+    (0.5, 0.03, 0),
+    (-0.3, 0.03, 0),
+    (-0.7, 0.03, 0),
+    (-1.0, 0.03, 0),
+    (0.0, -0.03, 0),
+    (0.2, -0.03, 0),
+    (0.4, -0.03, 0),
+    (0.5, -0.03, 0),
+    (-0.3, -0.03, 0),
+    (-0.7, -0.03, 0),
+    (-1.0, -0.03, 0),
+    (0.0, 0.03, 1),
+    (0.2, 0.03, 1),
+    (0.4, 0.03, 1),
+    (0.5, 0.03, 1),
+    (-0.3, 0.03, 1),
+    (-0.7, 0.03, 1),
+    (-1.0, 0.03, 1),
+    (0.0, -0.03, 1),
+    (0.2, -0.03, 1),
+    (0.4, -0.03, 1),
+    (0.5, -0.03, 1),
+    (-0.3, -0.03, 1),
+    (-0.7, -0.03, 1),
+    (-1.0, -0.03, 1),
+    (0.0, 0.03, 2),
+    (0.2, 0.03, 2),
+    (0.4, 0.03, 2),
+    (0.5, 0.03, 2),
+    (-0.3, 0.03, 2),
+    (-0.7, 0.03, 2),
+    (-1.0, 0.03, 2),
+    (0.0, -0.03, 2),
+    (0.2, -0.03, 2),
+    (0.4, -0.03, 2),
+    (0.5, -0.03, 2),
+    (-0.3, -0.03, 2),
+    (-0.7, -0.03, 2),
+    (-1.0, -0.03, 2)
+]
 
 def step(state, action):
     position, velocity = state
-    velocity += (action-1)*force + np.cos(3*position)*(-gravity)
-    velocity = np.clip(velocity, -max_speed, max_speed)
-    position += velocity
-    position = np.clip(position, min_position, max_position)
+    velocity = velocity + (action-1)*force + torch.cos(3*position)*(-gravity)
+    velocity = torch.clamp(velocity, -max_speed, max_speed)
+    position = position + velocity
+    position = torch.clamp(position, min_position, max_position)
     if (position==min_position and velocity<0): velocity = torch.tensor(0.0)
     return (position, velocity)
 
 def model(data):
-    a0 = pyro.sample('a0', dist.Normal(torch.zeros(1) + 3.0, 10 * torch.ones(1)))
-    for i in range(10):
-        position = dist.Uniform(min_position, max_position).sample()
-        velocity = dist.Uniform(-max_speed, max_speed).sample()
-        action = dist.Categorical(probs=torch.ones(3)/torch.sum(torch.ones(3))).sample()
-        # print(action)
-        # print("init: {} {} {}".format(position, velocity, action))
-        p, v = step((position, velocity), action)
-        # print("p v: {} {}".format(p, v))
-        # print((action-1)*force)
-        # print(a0*position)
-        # print((action-1)*force + np.cos(a0*position)*(-gravity))
-        e1 = (action-1)*force
-        e2 = torch.cos(a0*position)*(-gravity)
-        velocity = velocity + e1 + e2
+    a0 = pyro.sample('a1', dist.Normal(torch.zeros(1), 10 * torch.ones(1)))
+    a1 = pyro.sample('a2', dist.Normal(torch.zeros(1), 10 * torch.ones(1)))
+    a2 = pyro.sample('a3', dist.Normal(torch.zeros(1), 10 * torch.ones(1)))
+    a3 = pyro.sample('a4', dist.Normal(torch.zeros(1), 10 * torch.ones(1)))
+    for i in range(len(data)):
+        position = data[i][0]
+        velocity = data[i][1]
+        action = data[i][2]
+        velocityExpected = data[i][3]
+        velocity = a0 + a1 * velocity + a2 * position + a3 * velocity * position
         velocity = torch.clamp(velocity, -max_speed, max_speed)
-        position = position + velocity
-        position = torch.clamp(position, min_position, max_position)
-        if (position==min_position and velocity<0): velocity = torch.tensor(0.0)
-        pyro.sample("obs_p_{}".format(i), dist.Normal(position, 0.1 * torch.ones([1]).type(torch.Tensor)), obs = p)
-        pyro.sample("obs_v_{}".format(i), dist.Normal(velocity, 0.1 * torch.ones([1]).type(torch.Tensor)), obs = v)
+        pyro.sample("obs_v_{}".format(i), dist.Normal(velocity, 0.1 * torch.ones([1]).type(torch.Tensor)), obs = velocityExpected)
 
 def mcmc_solver():
+    data = []
+    for (p, v, a) in dataInput:
+        _, vNext = step((torch.tensor(p), torch.tensor(v)), torch.tensor(a))
+        data.append([p, v, a, vNext])
     nuts_kernel = NUTS(model, jit_compile=False,)
     mcmc = MCMC(nuts_kernel,
-                num_samples=100,
-                warmup_steps=100,
-                num_chains=1)
-    mcmc.run(model)
+                    num_samples=100,
+                    warmup_steps=100,
+                    num_chains=1)
+    data = torch.tensor(data)
+    mcmc.run(data)
     mcmc.summary(prob=0.8)
 
 def test(num):
-    state = torch.tensor(0.0), torch.tensor(0.0)
+    state = torch.tensor(0.0).type(torch.Tensor), torch.tensor(0.0).type(torch.Tensor)
     for i in range(num):
         print(state)
-        next = step(state, torch.tensor(2.0))
+        next = step(state, torch.tensor(2.0).type(torch.Tensor))
         state = next
 
 mcmc_solver()
