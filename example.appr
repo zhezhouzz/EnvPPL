@@ -36,6 +36,17 @@ dist ::= variables
 (* ——————————————————————–———————————————————————– *)
 (* Γ appr e1 e2: apprT T₄ *)
 
+(* normal function *)
+fun mountainCar (position, velocity, action) =
+    let
+        val velocity = velocity + (action - 1.0) * force + (cos (3*position))*(~gravity)
+        val velocity = clamp(velocity, ~maxSpeed, maxSpeed)
+        val position = clamp(postion + velocity, minPosition, maxPosition)
+        val velocity = if position < minPosition then 0.0 else velocity
+    in
+        (position, velocity)
+    end;
+
 (* Keyword: appred *)
 
 (* Γ e: T₁ *)
@@ -118,10 +129,18 @@ fun cartpole (x, xDot, theta, thetaDot, action) =
 (* There is a dangerous region, when velocity is greater than 2.0 and position is greater than 4.4. There is no action can push the car back from 4.8. *)
 (* When the car is close to the 4.8, I want it a little shift to 4.8 *)
 
+fun cosApprScript input =
+    let
+        val a0 = Normal(0.0, 10.0)
+        val a1 = Normal(0.0, 10.0)
+    in
+        a0 + a1 * input
+    end
+
 fun cartpole (x, xDot, theta, thetaDot, action) =
     let
         val force = (2.0 * action - 1.0)*forceMag
-        val costheta = cos(theta)
+        val costheta = appr(fn (theta, _, cos) => cos theta, (theta, _, cosApprScript))
         val sintheta = sin(theta)
         val temp = (force + polemassLength * thetaDot * thetaDot * sintheta) / totalMass
         val thetaacc = (gravity * sintheta - costheta * temp) / (length * (4.0/3.0 - masspole * costheta * costheta / totalMass))
