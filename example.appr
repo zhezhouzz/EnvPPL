@@ -1,0 +1,144 @@
+(*
+type ::= float
+| int
+| boolean
+| unit
+| type1 * type2
+| type1 -> type2
+| apprT type
+
+forall t: type, t <: apprT t. Which means a appr type + a concrate type is also a appr type.
+
+exp ::= variables
+| floating number
+| prim (exp1, exp2, ...)
+| fun "x" : type  => exp
+| exp1 exp2
+| case exp1 of ...
+| let val "x" = exp1 in exp2 end
+| appr (exp1, (exp2, exp2, dist))
+| appred exp
+| expectation exp
+
+dist ::= variables
+| distribution
+| prim (dist1, dist2, ...)
+| fun "x" : type => dist
+| dist1 dist2
+| case dist of ...
+| let val "x" = dist1 in dist2 end
+| partition dist exp
+*)
+
+(* Keyword: appr. *)
+
+(* Γ e1 : (T₁, T₂, Tdist) -> T₄, Γ e2: (T₁, T₂, Tdist) *)
+(* ——————————————————————–———————————————————————– *)
+(* Γ appr e1 e2: apprT T₄ *)
+
+(* Keyword: appred *)
+
+(* Γ e: T₁ *)
+(* _______________________________ *)
+(* Γ appred e: T₁ *)
+
+(* Keyword: expectation *)
+
+(* Γ e2: T₁, Γ e1: Range, Γ e3: Boolean *)
+(* _______________________________ *)
+(* Γ expectation (e1, e2, e3): () *)
+
+(* Keyword: partition *)
+
+(* Γ d: Tdist, Γ e: (T₁, T₂) -> Boolean *)
+(* _______________________________ *)
+(* Γ partition (d, e): Tdist *)
+
+(* normal function *)
+fun mountainCar (position, velocity, action) =
+    let
+        val velocity = velocity + (action - 1.0) * force + (cos (3*position))*(~gravity)
+        val velocity = clamp(velocity, ~maxSpeed, maxSpeed)
+        val position = clamp(postion + velocity, minPosition, maxPosition)
+        val velocity = if position < minPosition then 0.0 else velocity
+    in
+        (position, velocity)
+    end;
+
+(* when the car is in the village, I want it can move faster to get out of the valliage as soon as possible. *)
+(* in the village: a range, [~0.3, 0.3] *)
+(* move faster: two step as one step *)
+
+(* approximation script *)
+fun cosApprScript input =
+    let
+        val input = partition input (fn (a, b) => abs (a, b) > 0.2)
+        val a0 = Normal(0.0, 10.0)
+        val a1 = Normal(0.0, 10.0)
+    in
+        a0 + a1 * input
+    end
+
+fun mountainCar (position, velocity, action) =
+    let
+        val forceByAction = appr(fn (input, const, apprable) => const * (input - apprable), (action, force, Normal(1.0, 10.0)))
+        val tmp = appr(fn (input, const, apprable) => apprable (const * input), (position, 3.0, cosApprScript))
+        val velocityNew = velocity + forceByAction + tmp*(~gravity)
+        val velocityNew = clamp(velocityNew, ~maxSpeed, maxSpeed)
+        val positionNew = clamp(postion + velocityNew, minPosition, maxPosition)
+        val velocityNew = if positionNew < minPosition then 0.0 else velocityNew
+        val _ =
+            expectation
+                ([(-0.3, 0.3)],
+                 position,
+                 case mountainCar (position, velocity, action) of
+                     (p, v) => eqaul(mountainCar (p, v, action), appred mountainCar (position, velocity, action), 0.1)
+                )
+    in
+        (positionNew, velocityNew)
+    end;
+
+fun cartpole (x, xDot, theta, thetaDot, action) =
+    let
+        val force = (2.0 * action - 1.0)*forceMag
+        val costheta = cos(theta)
+        val sintheta = sin(theta)
+        val temp = (force + polemassLength * thetaDot * thetaDot * sintheta) / totalMass
+        val thetaacc = (gravity * sintheta - costheta * temp) / (length * (4.0/3.0 - masspole * costheta * costheta / totalMass))
+        val xacc = temp - polemassLength * thetaacc * costheta / totalMass
+        val xNew = x + tau * xDot
+        val xDotNew = xDot + tau * xacc
+        val thetaNew = theta + tau * thetaDot
+        val thetaDotNew = thetaDot + tau*thetaacc
+    in
+        (xNew, xDotNew, thetaNew, thetaDotNew)
+    end;
+
+(* We have a dead/halting region in the cartpole: if the car's position greater than 4.8, the task will end. *)
+(* There is a dangerous region, when velocity is greater than 2.0 and position is greater than 4.4. There is no action can push the car back from 4.8. *)
+(* When the car is close to the 4.8, I want it a little shift to 4.8 *)
+
+fun cartpole (x, xDot, theta, thetaDot, action) =
+    let
+        val force = (2.0 * action - 1.0)*forceMag
+        val costheta = cos(theta)
+        val sintheta = sin(theta)
+        val temp = (force + polemassLength * thetaDot * thetaDot * sintheta) / totalMass
+        val thetaacc = (gravity * sintheta - costheta * temp) / (length * (4.0/3.0 - masspole * costheta * costheta / totalMass))
+        val xacc = temp - polemassLength * thetaacc * costheta / totalMass
+        val xNew = appr (fn ((x, xDot), _, tau) => x + tau * xDot, ((x, xDot), _, Normal(0.02, 1.0)))
+        val xDotNew = xDot + tau * xacc
+        val thetaNew = theta + tau * thetaDot
+        val thetaDotNew = thetaDot + tau*thetaacc
+        val _ =
+            expectation
+                ([(4.1, 4.8), (2.0, _)],
+                 [x, xDot],
+                 let
+                     val (v0, v1, v2, v3) = carpole (x, xDot, theta, thetaDot, action)
+                 in
+                     equal (((4.8 + v0)/2.0, v1, v2, v3), appred cartpole (x, xDot, theta, thetaDot, action), 0.1)
+                 end)
+    in
+        (xNew, xDotNew, thetaNew, thetaDotNew)
+    end
