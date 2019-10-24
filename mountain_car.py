@@ -44,9 +44,9 @@ def space_maker (l):
         intermid = res
     return intermid
 
-d0 = space_maker([("continous", (-0.3, 0.0, 0.1)), ("continous", (-0.3, 0.3, 0.1)), ("discrete", (0, 3, 1))])
-d1 = space_maker([("continous", (0.0, 0.3, 0.1)), ("continous", (-0.3, 0.3, 0.1)), ("discrete", (0, 3, 1))])
-d2 = space_maker([("continous", (0.3, 0.6, 0.1)), ("continous", (-0.3, 0.3, 0.1)), ("discrete", (0, 3, 1))])
+d0 = space_maker([("continous", (-0.45, -0.3, 0.05)), ("continous", (-0.1, 0.1, 0.1)), ("discrete", (0, 3, 1))])
+d1 = space_maker([("continous", (-0.3, -0.15, 0.05)), ("continous", (-0.1, 0.1, 0.1)), ("discrete", (0, 3, 1))])
+d2 = space_maker([("continous", (-0.15, 0.0, 0.05)), ("continous", (-0.1, 0.1, 0.1)), ("discrete", (0, 3, 1))])
 
 data_input = [d0, d1, d2]
 
@@ -73,7 +73,7 @@ def stepAppr(a0, a1, state, action):
 def model(data):
     a0 = pyro.sample('a0', dist.Normal(torch.zeros(1), 10 * torch.ones(1)))
     a1 = pyro.sample('a1', dist.Normal(torch.zeros(1), 10 * torch.ones(1)))
-    # a2 = pyro.sample('a2', dist.Normal(torch.zeros(1), 10 * torch.ones(1)))
+    a2 = pyro.sample('a2', dist.Normal(torch.zeros(1), 10 * torch.ones(1)))
     # a3 = pyro.sample('a3', dist.Normal(torch.zeros(1), 10 * torch.ones(1)))
     for i in range(len(data)):
         position = data[i][0]
@@ -81,7 +81,7 @@ def model(data):
         action = data[i][2]
         p, v = step((position, velocity), action)
         p, v = step((p, v), action)
-        velocity = velocity + (action-1)*force + torch.cos(a0*position)*(-gravity)
+        velocity = velocity + (action-1)*force*a2 + a0*torch.cos(position)*(-gravity)
         velocity = torch.clamp(velocity, -max_speed, max_speed)
         position = position + a1 * velocity
         position = torch.clamp(position, min_position, max_position)
@@ -90,7 +90,7 @@ def model(data):
         # print("(p, v) = ({}, {})".format(p, v))
         # print("(position, velocity) = ({}, {})".format(position, velocity))
         # p, v = step((p, v), action)
-        pyro.sample("obs_v_{}".format(i), dist.Normal(velocity, 0.0001 * torch.ones([1]).type(torch.Tensor)), obs = v)
+        pyro.sample("obs_v_{}".format(i), dist.Normal(velocity - data[i][1], 0.0001 * torch.ones([1]).type(torch.Tensor)), obs = v - data[i][1])
         pyro.sample("obs_p_{}".format(i), dist.Normal(position - data[i][0], 0.0001 * torch.ones(1).type(torch.Tensor)), obs = p - data[i][0])
 
 def mcmc_solver(idx):

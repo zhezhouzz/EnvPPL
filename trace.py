@@ -73,20 +73,20 @@ class Agent:
             tmp = np.random.choice(3, 1, p=[0.25, 0.0, 0.75])
             return tmp[0]
         else:
-            tmp = np.random.choice(3, 1, p=[0.75, 0.0, 0.25])
+            tmp = np.random.choice(3, 1, p=[0.6, 0.0, 0.4])
             return tmp[0]
 
 epoch_num = 100
 state = 0.0, 0.0
 agent0 = Agent(-1.0)
-agent0 = Agent(-0.7)
+agent1 = Agent(-0.7)
 trace = []
 success = False
 for i in range(epoch_num):
     trace.append(state)
-    action = agent0.act(state)
-    # state, done, reward = step(state, action)
-    state, done, reward = stepAppr(state, action)
+    action = agent1.act(state)
+    state, done, reward = step(state, action)
+    # state, done, reward = stepAppr(state, action)
     if done:
         success = True
         trace.append(state)
