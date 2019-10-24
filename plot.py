@@ -1,11 +1,24 @@
 import matplotlib.pyplot as plt
+import trace
+import argparse
 
-trace = [(0.0, 0.0), (-0.006965, -0.0035), (-0.016914999987932833, -0.004999999993936097), (-0.03382999990469401, -0.008499999958171444), (-0.057709999536768544, -0.011999999815112834)]
-
-def trans(trace):
+def split(trace):
     ps = [p for p,v in trace]
     vs = [v for p,v in trace]
     return ps, vs
 
-plt.polt(xs, ys)
-plt.show()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("epoch_num", type = int)
+    parser.add_argument("epoch_num_appr", type = int)
+    parser.add_argument("turnaround", type = float)
+    args = parser.parse_args()
+    success, t = trace.run(epoch_num = args.epoch_num, turnaround = args.turnaround, appr = False)
+    success, t_appr = trace.run(epoch_num = args.epoch_num_appr, turnaround = args.turnaround, appr = True)
+    # print(success)
+    ps1, vs1 = split(t)
+    ps2, vs2 = split(t_appr)
+    plt.plot(ps1, vs1, '.b--', ps2, vs2, '.r--')
+    plt.xlabel('position')
+    plt.ylabel('velocity')
+    plt.show()

@@ -44,11 +44,14 @@ def space_maker (l):
         intermid = res
     return intermid
 
-d0 = space_maker([("continous", (-0.45, -0.3, 0.05)), ("continous", (-0.1, 0.1, 0.1)), ("discrete", (0, 3, 1))])
-d1 = space_maker([("continous", (-0.3, -0.15, 0.05)), ("continous", (-0.1, 0.1, 0.1)), ("discrete", (0, 3, 1))])
-d2 = space_maker([("continous", (-0.15, 0.0, 0.05)), ("continous", (-0.1, 0.1, 0.1)), ("discrete", (0, 3, 1))])
+d1 = space_maker([("continous", (-1.2, -0.9, 0.1)), ("continous", (-0.3, 0.3, 0.1)), ("discrete", (0, 3, 1))])
+d2 = space_maker([("continous", (-0.9, -0.6, 0.1)), ("continous", (-0.3, 0.3, 0.1)), ("discrete", (0, 3, 1))])
+d3 = space_maker([("continous", (-0.6, -0.3, 0.1)), ("continous", (-0.3, 0.3, 0.1)), ("discrete", (0, 3, 1))])
+d4 = space_maker([("continous", (-0.3, 0.0, 0.1)), ("continous", (-0.3, 0.3, 0.1)), ("discrete", (0, 3, 1))])
+d5 = space_maker([("continous", (0.0, 0.3, 0.1)), ("continous", (-0.3, 0.3, 0.1)), ("discrete", (0, 3, 1))])
+d6 = space_maker([("continous", (0.3, 0.6, 0.1)), ("continous", (-0.3, 0.3, 0.1)), ("discrete", (0, 3, 1))])
 
-data_input = [d0, d1, d2]
+data_input = [d0, d1, d2, d3, d4, d5, d6]
 
 def step(state, action):
     position, velocity = state
@@ -81,9 +84,9 @@ def model(data):
         action = data[i][2]
         p, v = step((position, velocity), action)
         p, v = step((p, v), action)
-        velocity = velocity + (action-1)*force*a2 + a0*torch.cos(position)*(-gravity)
+        velocity = velocity + (action-1)*force*a1 + a0*torch.cos(3.0 * position)*(-gravity)
         velocity = torch.clamp(velocity, -max_speed, max_speed)
-        position = position + a1 * velocity
+        position = position + a2 * velocity
         position = torch.clamp(position, min_position, max_position)
         if (position==min_position and velocity<0): velocity = torch.tensor(0.0)
         # print("f0 = {}".format(f0))
